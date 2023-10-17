@@ -1,0 +1,87 @@
+# version: '3'
+
+# services:
+#   postgres:
+#     image: postgres:latest
+#     environment:
+#       POSTGRES_USER: user
+#       POSTGRES_PASSWORD: password
+#       POSTGRES_DB: mydatabase
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     ports:
+#       - "5432:5432"
+
+#   pgadmin:
+#     image: dpage/pgadmin4:latest
+#     environment:
+#       PGADMIN_DEFAULT_EMAIL: admin@domain.com
+#       PGADMIN_DEFAULT_PASSWORD: adminpassword
+#     ports:
+#       - "8080:80"
+#     depends_on:
+#       - postgres
+#     volumes:
+#       - pgadmin_data:/var/lib/pgadmin
+
+# volumes:
+#   postgres_data:
+#   pgadmin_data:
+
+version: "3"
+services:
+  postgres:
+    image: "postgres:latest"
+  redis:
+    image: "redis:latest"
+    command: ["redis-server", "--protected-mode", "no"]
+  nginx:
+    depends_on:
+      - api
+      - client
+    restart: always
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./nginx
+    ports:
+      # 3050 on local machine and 80 inside the container
+      - "3050:80"
+  api:
+    build:
+      #Specify only dockerfile name and not the full path
+      dockerfile: Dockerfile.dev
+      # specify the path where docker must winf the specified Dockerfile
+      context: ./server
+    volumes:
+      # don't try to override this folder
+      - /app/node_modules
+      # copy evertyhnig from server in the folder app from the container
+      - ./server:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PGUSER=postgres
+      - PGHOST=postgres
+      - PGDATABASE=postgres
+      - PGPASSWORD=postgres_password
+      - PGPORT=5432
+  client:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./client
+    volumes:
+      - /app/node_modules
+      - ./client:/app
+    # for development
+    environment:
+      - WDS_SOCKET_PORT=0
+  worker:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./worker
+    volumes:
+      - /app/node_modules
+      - ./worker:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
